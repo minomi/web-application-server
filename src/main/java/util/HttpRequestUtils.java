@@ -4,16 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.net.util.URLUtil;
 import webserver.Request;
 import webserver.RequestHandler;
 import webserver.RequestMethod;
@@ -122,24 +121,46 @@ public class HttpRequestUtils {
 
     public static Request parseRequestFrom(InputStream in) throws IOException {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+        List<String> headerLines = getHeaderLines(bufferedReader);
+        String[] splitFirstLine = headerLines.get(0).split(" ");
+        RequestMethod method = RequestMethod.valueOf(splitFirstLine[0]);
+        String urlString = splitFirstLine[1];
+        String version = splitFirstLine[2];
+
+        if (urlString.equals("/")) {
+            urlString = WebServer.WELCOME_FILE;
+        }
+
+        Map<String, String> headers = new HashMap<>();
+        headerLines.subList(1, headerLines.size()).forEach(headerLine -> {
+            Pair pair = HttpRequestUtils.parseHeader(headerLine);
+            headers.put(pair.getKey(), pair.getValue());
+        });
+
+        Request request = new Request(method, urlString, headers, version);
+
+        if (headers.containsKey("Content-Length")) {
+            int contentLength = Integer.parseInt(headers.get("Content-Length"));
+            Map<String, String> params = parseQueryString(IOUtils.readData(bufferedReader, contentLength));
+            request.setParameters(params);
+        }
+
+        log.debug("Parse request from InputStream {}, {}, {}", method, urlString, version);
+
+        return request;
+    }
+
+    public static List<String> getHeaderLines(BufferedReader bufferedReader) throws IOException {
         ArrayList<String> lines = new ArrayList<>();
         String temp;
         while (!(temp = bufferedReader.readLine()).equals("")) {
             lines.add(temp);
         }
-        String[] split = lines.get(0).split(" ");
+        return lines;
+    }
 
-        RequestMethod method = RequestMethod.valueOf(split[0]);
-        String resourcePath = split[1];
-        String version = split[2];
-
-        log.debug("Parse request from InputStream {}, {}, {}", method, resourcePath, version);
-
-        if (resourcePath.equals("/")) {
-            resourcePath = WebServer.WELCOME_FILE;
-        }
-
-        return new Request(method, resourcePath, version);
+    public static String targetPathFrom(String urlString) {
+        return urlString.split("\\?")[0];
     }
 
 }
