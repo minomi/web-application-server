@@ -15,7 +15,9 @@
 * 각 요구사항을 구현하는 것이 중요한 것이 아니라 구현 과정을 통해 학습한 내용을 인식하는 것이 배움에 중요하다. 
 
 ### 요구사항 1 - http://localhost:8080/index.html로 접속시 응답
-* 
+* 왜?? http://localhost:8080/ 로 접속시 accept 가 여러번??
+    * css, js, image 등 정적 리소스 때문에
+* Files.readAllBytes 좋은 함수 발견
 
 ### 요구사항 2 - get 방식으로 회원가입
 * 

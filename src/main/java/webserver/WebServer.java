@@ -10,6 +10,9 @@ public class WebServer {
     private static final Logger log = LoggerFactory.getLogger(WebServer.class);
     private static final int DEFAULT_PORT = 8080;
 
+    public static final String ROOT = "./webapp";
+    public static final String WELCOME_FILE = "/index.html";
+
     public static void main(String args[]) throws Exception {
         int port = 0;
         if (args == null || args.length == 0) {

@@ -1,13 +1,26 @@
 package util;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import webserver.Request;
+import webserver.RequestHandler;
+import webserver.RequestMethod;
+import webserver.WebServer;
 
 public class HttpRequestUtils {
+    private static final Logger log = LoggerFactory.getLogger(HttpRequestUtils.class);
     /**
      * @param queryString은
      *            URL에서 ? 이후에 전달되는 field1=value1&field2=value2 형식임
@@ -106,4 +119,27 @@ public class HttpRequestUtils {
             return "Pair [key=" + key + ", value=" + value + "]";
         }
     }
+
+    public static Request parseRequestFrom(InputStream in) throws IOException {
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+        ArrayList<String> lines = new ArrayList<>();
+        String temp;
+        while (!(temp = bufferedReader.readLine()).equals("")) {
+            lines.add(temp);
+        }
+        String[] split = lines.get(0).split(" ");
+
+        RequestMethod method = RequestMethod.valueOf(split[0]);
+        String resourcePath = split[1];
+        String version = split[2];
+
+        log.debug("Parse request from InputStream {}, {}, {}", method, resourcePath, version);
+
+        if (resourcePath.equals("/")) {
+            resourcePath = WebServer.WELCOME_FILE;
+        }
+
+        return new Request(method, resourcePath, version);
+    }
+
 }
