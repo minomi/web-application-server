@@ -13,10 +13,7 @@ import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.net.util.URLUtil;
-import webserver.Request;
-import webserver.RequestHandler;
-import webserver.RequestMethod;
-import webserver.WebServer;
+import webserver.*;
 
 public class HttpRequestUtils {
     private static final Logger log = LoggerFactory.getLogger(HttpRequestUtils.class);
@@ -132,9 +129,10 @@ public class HttpRequestUtils {
         }
 
         Map<String, String> headers = new HashMap<>();
-        headerLines.subList(1, headerLines.size()).forEach(headerLine -> {
-            Pair pair = HttpRequestUtils.parseHeader(headerLine);
-            headers.put(pair.getKey(), pair.getValue());
+        headerLines.subList(1, headerLines.size())
+                .forEach(headerLine -> {
+                    Pair pair = HttpRequestUtils.parseHeader(headerLine);
+                    headers.put(pair.getKey(), pair.getValue());
         });
 
         Request request = new Request(method, urlString, headers, version);
@@ -145,12 +143,17 @@ public class HttpRequestUtils {
             request.setParameters(params);
         }
 
-        log.debug("Parse request from InputStream {}, {}, {}", method, urlString, version);
+        if (headers.containsKey("Cookie")) {
+            Cookies cookies = new Cookies(parseCookies(headers.get("Cookie")));
+            request.setCookies(cookies);
+        }
+
+        log.debug("Parse request from InputStream {}", request);
 
         return request;
     }
 
-    public static List<String> getHeaderLines(BufferedReader bufferedReader) throws IOException {
+    private static List<String> getHeaderLines(BufferedReader bufferedReader) throws IOException {
         ArrayList<String> lines = new ArrayList<>();
         String temp;
         while (!(temp = bufferedReader.readLine()).equals("")) {

@@ -2,6 +2,7 @@ package webserver;
 
 import util.HttpRequestUtils;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,6 +16,7 @@ public class Request {
     private String targetPath;
     private Map<String, String> headers;
     private Map<String, String> parameters;
+    private Cookies cookies;
 
     public Request(RequestMethod method, String urlString, Map<String, String> headers, String version) {
         this.method = method;
@@ -77,5 +79,23 @@ public class Request {
 
     public void setParameters(Map<String, String> parameters) {
         this.parameters = parameters;
+    }
+
+    public Cookies getCookies() {
+        return cookies;
+    }
+
+    public void setCookies(Cookies cookies) {
+        this.cookies = cookies;
+    }
+
+    @Override
+    public String toString() {
+        return "[" +
+                "Method : " + method + "\n" +
+                "UrlString : " + urlString + "\n" +
+                "Parameters : " + parameters + "\n" +
+                "Cookies : " + cookies + "\n" +
+                "]";
     }
 }

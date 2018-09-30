@@ -5,8 +5,6 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -15,9 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import service.UserService;
 import util.HttpRequestUtils;
-import util.IOUtils;
-
-import javax.jws.WebService;
+import util.UserUtils;
 
 public class RequestHandler extends Thread {
     private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
@@ -44,38 +40,79 @@ public class RequestHandler extends Thread {
     }
 
     private void handle(Request request, OutputStream out) throws IOException {
-        if (request.getTargetPath().equals("/user/create")) {
-            Map<String, String> params = request.getParameters();
-            String id = params.get("userId");
-            String pw = params.get("password");
-            String name = params.get("name");
-            String email = params.get("email");
-            User newUser = new User(id, pw, name, email);
-            userService.join(newUser);
+        String targetPath = request.getTargetPath();
+        Map<String, String> params = request.getParameters();
+        DataOutputStream dataOutputStream = new DataOutputStream(out);
+
+        if (targetPath.equals("/user/create")) {
+            User user = UserUtils.user(params);
+            if (userService.join(user)) { response302Header(dataOutputStream, "/index.html"); }
+            return;
         }
 
-        DataOutputStream dataOutputStream = new DataOutputStream(out);
+        if (targetPath.equals("/user/login")) {
+            User user = UserUtils.user(params);
+            String redirectURL = userService.login(user) ? "/index.html" : "/user/login_failed.html";
+            Cookies cookies = userService.login(user) ?
+                    new Cookies().putKeyValue("logined", "true") :
+                    new Cookies().putKeyValue("logined", "false");
+            response302Header(dataOutputStream, redirectURL, cookies);
+            return;
+        }
+
         Path path = Paths.get(WebServer.ROOT + request.getTargetPath());
         byte[] body = Files.readAllBytes(path);
-        response200Header(dataOutputStream, body.length);
+        response200Header(dataOutputStream, body.length, Optional.ofNullable(request.getCookies()));
         responseBody(dataOutputStream, body);
     }
 
-    private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
+    private void response302Header(DataOutputStream dataOutputStream, String redirectURL) {
         try {
-            dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
-            dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
-            dos.writeBytes("\r\n");
+            _response302Header(dataOutputStream, redirectURL);
+            dataOutputStream.writeBytes("\r\n");
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private void responseBody(DataOutputStream dos, byte[] body) {
+    private void response302Header(DataOutputStream dataOutputStream, String redirectURL, Cookies cookies) {
         try {
-            dos.write(body, 0, body.length);
-            dos.flush();
+            _response302Header(dataOutputStream, redirectURL);
+            dataOutputStream.writeBytes(cookies.makeResponseString());
+            dataOutputStream.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void _response302Header(DataOutputStream dataOutputStream, String redirectURL) {
+        try {
+            dataOutputStream.writeBytes("HTTP/1.1 302 Found \r\n");
+            dataOutputStream.writeBytes("Location: "+ redirectURL +"\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response200Header(
+            DataOutputStream dataOutputStream,
+            int lengthOfBodyContent,
+            Optional<Cookies> optionalCookies) {
+        try {
+            dataOutputStream.writeBytes("HTTP/1.1 200 OK \r\n");
+            dataOutputStream.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dataOutputStream.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            optionalCookies.ifPresent(Cookies::makeResponseString);
+            dataOutputStream.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void responseBody(DataOutputStream dataOutputStream, byte[] body) {
+        try {
+            dataOutputStream.write(body, 0, body.length);
+            dataOutputStream.flush();
         } catch (IOException e) {
             log.error(e.getMessage());
         }
