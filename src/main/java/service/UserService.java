@@ -4,6 +4,8 @@ import db.DataBase;
 import model.User;
 import util.UserUtils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,6 +26,10 @@ public class UserService {
         return optionalUser
                 .filter(userFromDB -> UserUtils.checkPassword(user, userFromDB))
                 .isPresent();
+    }
+
+    public List<User> list() {
+        return new ArrayList<>(DataBase.findAll());
     }
 
 }

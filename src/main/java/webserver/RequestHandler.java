@@ -5,21 +5,20 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.Optional;
 
-import model.User;
+
+import http.Cookies;
+import http.Request;
+import http.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import service.UserService;
 import util.HttpRequestUtils;
-import util.UserUtils;
 
 public class RequestHandler extends Thread {
     private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
 
     private Socket connection;
-    private UserService userService = new UserService();
 
     public RequestHandler(Socket connectionSocket) {
         this.connection = connectionSocket;
@@ -30,80 +29,69 @@ public class RequestHandler extends Thread {
                         .getInetAddress(),
                 connection.getPort());
 
-        try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream()) {
-            // TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
+        try (InputStream in = connection.getInputStream();
+             OutputStream out = connection.getOutputStream()) {
+            DataOutputStream dataOutputStream = new DataOutputStream(out);
+            
             Request request = HttpRequestUtils.parseRequestFrom(in);
-            handle(request, out);
+            Response response = new Response();
+
+            if (request.getUrlString().startsWith("/js") ||
+                request.getUrlString().startsWith("/css")) {
+                String urlString = request.getUrlString();
+                Path path = Paths.get(WebServer.ROOT + urlString);
+                response.appendBody(Files.readAllBytes(path));
+            }
+
+            DispatcherServlet dispatcherServlet = new DispatcherServlet();
+            dispatcherServlet.service(request, response);
+
+            if(response.getResponseCode() == 302) {
+                response302Header(dataOutputStream, response);
+                return;
+            }
+            
+            response200Header(dataOutputStream, response);
+            responseBody(dataOutputStream, response.getBody());
+
+            log.debug("Parse request {}", request);
+            log.debug("Parse response {}", response);
+
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private void handle(Request request, OutputStream out) throws IOException {
-        String targetPath = request.getTargetPath();
-        Map<String, String> params = request.getParameters();
-        DataOutputStream dataOutputStream = new DataOutputStream(out);
 
-        if (targetPath.equals("/user/create")) {
-            User user = UserUtils.user(params);
-            if (userService.join(user)) { response302Header(dataOutputStream, "/index.html"); }
-            return;
-        }
 
-        if (targetPath.equals("/user/login")) {
-            User user = UserUtils.user(params);
-            String redirectURL = userService.login(user) ? "/index.html" : "/user/login_failed.html";
-            Cookies cookies = userService.login(user) ?
-                    new Cookies().putKeyValue("logined", "true") :
-                    new Cookies().putKeyValue("logined", "false");
-            response302Header(dataOutputStream, redirectURL, cookies);
-            return;
-        }
-
-        Path path = Paths.get(WebServer.ROOT + request.getTargetPath());
-        byte[] body = Files.readAllBytes(path);
-        response200Header(dataOutputStream, body.length, Optional.ofNullable(request.getCookies()));
-        responseBody(dataOutputStream, body);
-    }
-
-    private void response302Header(DataOutputStream dataOutputStream, String redirectURL) {
-        try {
-            _response302Header(dataOutputStream, redirectURL);
-            dataOutputStream.writeBytes("\r\n");
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
-    }
-
-    private void response302Header(DataOutputStream dataOutputStream, String redirectURL, Cookies cookies) {
-        try {
-            _response302Header(dataOutputStream, redirectURL);
-            dataOutputStream.writeBytes(cookies.makeResponseString());
-            dataOutputStream.writeBytes("\r\n");
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
-    }
-
-    private void _response302Header(DataOutputStream dataOutputStream, String redirectURL) {
+    private void response302Header(DataOutputStream dataOutputStream, Response response) {
         try {
             dataOutputStream.writeBytes("HTTP/1.1 302 Found \r\n");
-            dataOutputStream.writeBytes("Location: "+ redirectURL +"\r\n");
+            dataOutputStream.writeBytes("Location: "+ response.getRedirectUrl() +"\r\n");
+            Optional.ofNullable(response.getCookies())
+                    .ifPresent(cookies -> writeCookies(dataOutputStream, cookies));
+            dataOutputStream.writeBytes("\r\n");
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private void response200Header(
-            DataOutputStream dataOutputStream,
-            int lengthOfBodyContent,
-            Optional<Cookies> optionalCookies) {
+    private void response200Header(DataOutputStream dataOutputStream, Response response) {
         try {
             dataOutputStream.writeBytes("HTTP/1.1 200 OK \r\n");
-            dataOutputStream.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
-            dataOutputStream.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
-            optionalCookies.ifPresent(Cookies::makeResponseString);
+            dataOutputStream.writeBytes("Content-Type: " + response.getContentType() + "\r\n");
+            dataOutputStream.writeBytes("Content-Length: " + response.getContentLength() + "\r\n");
+            Optional.ofNullable(response.getCookies())
+                    .ifPresent(cookies -> writeCookies(dataOutputStream, cookies));
             dataOutputStream.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void writeCookies(DataOutputStream dataOutputStream, Cookies cookies) {
+        try {
+            dataOutputStream.writeBytes(cookies.makeResponseString());
         } catch (IOException e) {
             log.error(e.getMessage());
         }

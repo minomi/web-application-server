@@ -3,8 +3,12 @@ package util;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.Socket;
 import java.util.Map;
 
+import http.Request;
 import org.junit.Test;
 
 import util.HttpRequestUtils.Pair;
@@ -70,4 +74,17 @@ public class HttpRequestUtilsTest {
         Pair pair = HttpRequestUtils.parseHeader(header);
         assertThat(pair, is(new Pair("Content-Length", "59")));
     }
+
+    @Test
+    public void parseContentType() {
+        Request request = new Request().setAccept("*/*");
+        String responseContentType = HttpRequestUtils.parseContentType(request);
+        assertEquals("text/html; charset=UTF-8", responseContentType);
+
+        request.setAccept("text/css, */*, q=0.1");
+        responseContentType = HttpRequestUtils.parseContentType(request);
+        assertEquals("text/css; charset=UTF-8", responseContentType);
+    }
+
+
 }

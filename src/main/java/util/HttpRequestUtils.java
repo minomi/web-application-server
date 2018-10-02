@@ -4,15 +4,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+import http.Cookies;
+import http.Request;
+import http.RequestMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.net.util.URLUtil;
 import webserver.*;
 
 public class HttpRequestUtils {
@@ -121,6 +122,7 @@ public class HttpRequestUtils {
         List<String> headerLines = getHeaderLines(bufferedReader);
         String[] splitFirstLine = headerLines.get(0).split(" ");
         RequestMethod method = RequestMethod.valueOf(splitFirstLine[0]);
+
         String urlString = splitFirstLine[1];
         String version = splitFirstLine[2];
 
@@ -135,7 +137,10 @@ public class HttpRequestUtils {
                     headers.put(pair.getKey(), pair.getValue());
         });
 
-        Request request = new Request(method, urlString, headers, version);
+        Request request = new Request().setMethod(method)
+                                        .setUrlString(urlString)
+                                        .setHeaders(headers)
+                                        .setVersion(version);
 
         if (headers.containsKey("Content-Length")) {
             int contentLength = Integer.parseInt(headers.get("Content-Length"));
@@ -148,7 +153,8 @@ public class HttpRequestUtils {
             request.setCookies(cookies);
         }
 
-        log.debug("Parse request from InputStream {}", request);
+        String accept = headers.getOrDefault("Accept", "text/html");
+        request.setAccept(accept);
 
         return request;
     }
@@ -162,8 +168,12 @@ public class HttpRequestUtils {
         return lines;
     }
 
-    public static String targetPathFrom(String urlString) {
-        return urlString.split("\\?")[0];
+    public static String parseContentType(Request request) {
+        String charSet = " charset=UTF-8";
+        if (request.getAccept().startsWith("text/css")) {
+            return "text/css;" + charSet;
+        }
+        return "text/html;" + charSet;
     }
 
 }

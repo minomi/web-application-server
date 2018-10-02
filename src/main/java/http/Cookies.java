@@ -1,4 +1,4 @@
-package webserver;
+package http;
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,8 +20,8 @@ public class Cookies {
         this.cookies = cookies;
     }
 
-    public Cookies putKeyValue(String key, String value) {
-        cookies.put(key, value);
+    public Cookies putKeyValue(String name, String value) {
+        cookies.put(name, value);
         return this;
     }
 
@@ -30,6 +30,10 @@ public class Cookies {
                 .stream()
                 .reduce("", (response, key) ->
                         response += ("Set-Cookie: " + key + "=" + cookies.get(key) + "; Path=" + path + "\r\n"));
+    }
+
+    public String get(String name) {
+        return cookies.get(name);
     }
 
     public void setPath(String path) {
