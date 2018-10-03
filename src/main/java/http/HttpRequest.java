@@ -19,6 +19,10 @@ public class HttpRequest {
 	
 	private RequestParams requestParams = new RequestParams();
 
+	private HttpCookie cookies;
+
+	private HttpSession httpSession;
+
 	public HttpRequest(InputStream is) {
 		try {
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
@@ -62,5 +66,11 @@ public class HttpRequest {
 
 	public String getParameter(String name) {
 		return requestParams.getParameter(name);
+	}
+
+	public HttpSession getSession() { return HttpSessions.getSession(getCookies().getValue("JSESSIONID")); }
+
+	public HttpCookie getCookies() {
+		return new HttpCookie(getHeader("Cookie"));
 	}
 }
